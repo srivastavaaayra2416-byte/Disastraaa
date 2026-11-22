@@ -1,0 +1,399 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#040810">
+<meta name="description" content="Disastra · Space-Based Disaster Management & Holographic Tactical Rescue Platform">
+<title>DISASTRA // ORBITAL RESCUE COMMAND</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
+<link rel="stylesheet" href="./app.css">
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon.svg">
+</head>
+<body>
+<div class="shell">
+  <!-- Top Orbital Telemetry Header -->
+  <header class="top">
+    <div class="brand">
+      <div class="mark" aria-hidden="true">D</div>
+      <div>
+        DISASTRA
+        <small>ORBITAL HAZARD & RESCUE TELEMETRY</small>
+      </div>
+    </div>
+    <div class="righthead">
+      <span class="live" id="apiStatus">SATELLITE LINK SYNCING</span>
+      <div class="switch" role="tablist" aria-label="Choose tactical console">
+        <button class="active" id="tab-command" role="tab" aria-selected="true">Command Deck</button>
+        <button id="tab-citizen" role="tab" aria-selected="false">Citizen Uplink</button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Command Room Console -->
+  <main id="command" class="page active" aria-label="Tactical Command Console">
+    <div class="mainhead">
+      <div>
+        <div class="eyebrow">DISASTRA · ORBITAL SENSOR GRID · THEME 03</div>
+        <h1>TACTICAL SITUATION MATRIX</h1>
+        <div class="sub">
+          <span id="regionLabel">Select planetary target on radar · telemetry awaiting uplink</span> · 
+          <span class="fresh" id="updatedAt">Connecting to orbital relay</span>
+        </div>
+      </div>
+      <div class="header-actions">
+        <label class="api-config">
+          RELAY <input id="apiBase" aria-label="Backend API base URL" value="http://localhost:8000">
+        </label>
+        <button class="btn" id="refreshData">⟳ Sync Feed</button>
+        <button class="alertbtn" id="enableAlerts" aria-label="Enable audible Red SOS alerts">♩ SATELLITE KLAXON</button>
+      </div>
+    </div>
+
+    <div class="grid">
+      <!-- Left Column: Radar Map & Route Planner -->
+      <section>
+        <div class="card">
+          <div class="cardhead">
+            <div>
+              <h2>Planetary Hazard Radar</h2>
+              <p>Sentinel-1 SAR Radar Scan & Flood Mask Polygons</p>
+            </div>
+            <span class="tiny" id="mapCoordinates">SCANNING ORBIT...</span>
+          </div>
+          <div class="map">
+            <div id="liveMap" class="leaflet-map" role="application" aria-label="Tactical Radar Map with Hazard Zones, SOS Beacons and Facilities"></div>
+            <div class="mapctrl">
+              <button id="clusterToggle" aria-label="Toggle SOS clusters">⊙ Sensor Clusters: ON</button>
+              <button id="zoomMap" aria-label="Zoom map">＋</button>
+            </div>
+          </div>
+          <div class="layerbar">
+            <span class="map-source">ORBITAL SAR RADAR</span>
+            <label class="layer"><input type="checkbox" checked data-layer="zones"> Hazard Zones</label>
+            <label class="layer"><input type="checkbox" checked data-layer="safe"> Safe Zones</label>
+            <label class="layer"><input type="checkbox" checked data-layer="sos"> SOS Beacons</label>
+            <label class="layer"><input type="checkbox" checked data-layer="facilities"> Facilities</label>
+            <label class="layer"><input type="checkbox" checked data-layer="routes"> Rescue Paths</label>
+            <label class="layer"><input type="checkbox" disabled aria-label="Satellite imagery provider not configured"> Optical Earth Layer · Offline</label>
+            <div class="legend" aria-label="Zone pattern legend">
+              <span><i class="swatch red-pattern"></i>Inundated (Red)</span>
+              <span><i class="swatch yellow-pattern"></i>Buffer (Yellow)</span>
+              <span><i class="swatch green-pattern"></i>Passable (Green)</span>
+            </div>
+          </div>
+          <div class="mapfoot">
+            <span>◉ TELEMETRY V1.1 · SENTINEL-1 SAR FLOOD DETECTION ACTIVE</span>
+            <span>Real-time orbital data synced via backend</span>
+          </div>
+        </div>
+
+        <div class="card routecard">
+          <div class="cardhead">
+            <div>
+              <h2>Safe Detour & Vector Calculator</h2>
+              <p id="routeFor">Select an active SOS beacon on the radar</p>
+            </div>
+            <span class="tag" id="routeSeverity">NO TARGET</span>
+          </div>
+          <div class="routebody">
+            <label class="route-select">
+              Safe Haven
+              <select id="destinationSelect" aria-label="Choose safe facility">
+                <option value="">Querying nearest safe facilities...</option>
+              </select>
+            </label>
+            <label class="route-select">
+              Vehicle
+              <select id="vehicleSelect" aria-label="Choose response vehicle">
+                <option value="">Auto-allocate transport unit</option>
+              </select>
+            </label>
+            <div class="routechoice">
+              <i class="line-sample"></i> Direct Vector (Hazard Risk) 
+              <b id="defaultRouteMetric">—</b>
+            </div>
+            <div class="routechoice">
+              <i class="line-sample safe"></i> Hazard-Avoiding Rescue Corridor 
+              <b id="safeRouteMetric">—</b>
+            </div>
+            <div id="routeRisk" class="notice">
+              Hazard calculations dynamically penalize flooded sectors and crowdsourced obstacles.
+            </div>
+            <button class="btn primary dispatch" id="dispatchBtn" disabled>Authorize Fast-Lane Dispatch →</button>
+            <div class="notice">
+              Hospital pre-alerts and transport notifications are transmitted automatically via space relay.
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Right Column: Telemetry, SOS Queue, Facilities, Intel -->
+      <aside class="side">
+        <!-- Population Matrix -->
+        <div class="card">
+          <div class="cardhead">
+            <div>
+              <h2>Demographic Impact Grid</h2>
+              <p>WorldPop Gridded Satellite Census</p>
+            </div>
+            <span class="tiny">ORBITAL OVERLAY</span>
+          </div>
+          <div class="impactgrid">
+            <div class="impact">
+              <strong id="impactRed">—</strong>
+              <span>Submerged Red Zone</span>
+            </div>
+            <div class="impact">
+              <strong id="impactYellow">—</strong>
+              <span>Warning Yellow Zone</span>
+            </div>
+            <div class="impact">
+              <strong id="impactGreen">—</strong>
+              <span>Safe Green Staging</span>
+            </div>
+          </div>
+          <div class="callout">
+            Demographic exposure computed from satellite footprint and gridded density models.
+          </div>
+        </div>
+
+        <!-- SOS Queue -->
+        <div class="card queuecard">
+          <div class="cardhead">
+            <div>
+              <h2>Emergency Distress Queue</h2>
+              <p><span id="queueCount">0</span> incoming beacons · Red Priority Pinned</p>
+            </div>
+            <button class="btn" id="batchBtn">Batch Yellow</button>
+          </div>
+          <div class="queuebar">
+            <select id="levelFilter" aria-label="Filter by SOS level">
+              <option value="all">All Distress Levels</option>
+              <option value="red">Red SOS (Urgent: Life Threat)</option>
+              <option value="yellow">Yellow SOS (Minor: Supplies/Aid)</option>
+            </select>
+            <select id="needFilter" aria-label="Filter by need">
+              <option value="all">All Need Profiles</option>
+              <option>Medical</option>
+              <option>Water</option>
+              <option>Evacuation</option>
+            </select>
+          </div>
+          <div class="queue" id="queue"></div>
+        </div>
+
+        <!-- Safe Facilities -->
+        <div class="card" id="facilityCard">
+          <div class="cardhead">
+            <div>
+              <h2>Safe Facilities (Excluding Red Zones)</h2>
+              <p>Hospitals, Shelters & Fire Stations</p>
+            </div>
+            <span class="tiny" id="facilityOrigin">Pick a beacon</span>
+          </div>
+          <div id="facilityList" class="data-list">
+            <div class="empty-state">Select an SOS or tap radar location to find safe facilities.</div>
+          </div>
+        </div>
+
+        <!-- Response Fleet -->
+        <div class="card">
+          <div class="cardhead">
+            <div>
+              <h2>Rescue Transport Fleet</h2>
+              <p>Registered Amphibious, Medical & Relief Units</p>
+            </div>
+            <span class="tiny" id="vehicleCount">—</span>
+          </div>
+          <div id="vehicleList" class="data-list">
+            <div class="empty-state">Polling fleet registry...</div>
+          </div>
+        </div>
+
+        <!-- Ground Reports -->
+        <div class="card">
+          <div class="cardhead">
+            <div>
+              <h2>Ground Obstacle Reports</h2>
+              <p>Crowdsourced Road & Obstruction Telemetry</p>
+            </div>
+            <button class="btn" id="roadReportBtn">＋ Report Blockage</button>
+          </div>
+          <div id="roadList" class="data-list">
+            <div class="empty-state">No route blockages reported in sector.</div>
+          </div>
+        </div>
+
+        <!-- Satellite Intelligence Scope -->
+        <div class="card intel-card">
+          <div class="cardhead">
+            <div>
+              <h2>Orbital Reconnaissance Telemetry</h2>
+              <p>Sentinel-1 / Copernicus Sensor Observations</p>
+            </div>
+            <span class="orbit-chip">◉ PASS ACTIVE</span>
+          </div>
+          <div class="intel-body">
+            <div class="orbit-visual" aria-hidden="true"></div>
+            <div class="intel-data">
+              <div>
+                <small>OBSERVATION STATUS</small>
+                <strong id="satStatus">Polling satellite downlink...</strong>
+              </div>
+              <div>
+                <small>CONSTELLATION</small>
+                <strong id="satSource">Sentinel-1 SAR / ISRO</strong>
+              </div>
+              <div>
+                <small>LAST ORBIT PASS</small>
+                <strong id="satTime">—</strong>
+              </div>
+              <div>
+                <small>HAZARD TYPE</small>
+                <strong id="satHazard">—</strong>
+              </div>
+              <div>
+                <small>CLASSIFICATION CONFIDENCE</small>
+                <strong id="satIntensity">—</strong>
+              </div>
+              <div>
+                <small>FLOOD SURFACE AREA</small>
+                <strong id="satArea">—</strong>
+              </div>
+            </div>
+          </div>
+          <div class="callout">
+            Satellite observations indicate detected flood extent from radar backscatter anomaly analysis.
+          </div>
+        </div>
+      </aside>
+    </div>
+  </main>
+
+  <!-- Citizen / Offline Survivor Uplink -->
+  <main id="citizen" class="page" aria-label="Citizen Survivor Uplink">
+    <div class="citizen">
+      <div class="mainhead">
+        <div style="display:flex;align-items:center;justify-content:space-between">
+          <div class="eyebrow">CITIZEN COMMUNICATOR · SATELLITE UPLINK</div>
+          <label class="tiny" for="language">
+            LANGUAGE 
+            <select id="language" aria-label="Choose language" style="border:1px solid var(--space-border);border-radius:4px;padding:4px;background:#09162e;color:#fff">
+              <option value="en">English</option>
+              <option value="hi">हिन्दी</option>
+              <option value="awa">अवधी</option>
+            </select>
+          </label>
+        </div>
+        <h1>RESCUE IS WITHIN REACH.</h1>
+      </div>
+
+      <div class="zonebanner">
+        <div id="citizenZone">
+          ⌖ Planetary Location: Not Set
+          <small>Tap your coordinates on the tactical radar below</small>
+        </div>
+        <span class="offline" id="citizenLocationState">GPS REQUIRED</span>
+      </div>
+
+      <!-- RED SOS -->
+      <button class="sosbtn red" id="redSOS" aria-label="Red SOS. Urgent: life in danger. Tap to send emergency alert">
+        <span class="sos-symbol">♨</span>
+        <span class="sos-copy">
+          <strong>RED SOS // CRITICAL</strong>
+          <span>URGENT · LIFE IN DANGER · 1-TAP OVERRIDE</span>
+        </span>
+      </button>
+
+      <!-- YELLOW SOS -->
+      <button class="sosbtn yellow" id="yellowSOS" aria-label="Yellow SOS. Need help. Tap to request supplies or assistance">
+        <span class="sos-symbol">⚠</span>
+        <span class="sos-copy">
+          <strong>YELLOW SOS // ASSIST</strong>
+          <span>NEED AID · FOOD, WATER, MEDICAL OR EVACUATION</span>
+        </span>
+      </button>
+
+      <!-- I AM SAFE -->
+      <button class="safe" id="safeBtn">✓ MARK TRANSMITTER AS SAFE</button>
+
+      <div class="privacy">
+        <i>⌖</i>
+        <span>Coordinates encrypted. Precise location shared only with authorized SAR units. Public view is fuzzed for privacy.</span>
+      </div>
+
+      <!-- Distress Status Stepper -->
+      <div class="panel" id="statusPanel">
+        <h3>Uplink Transmission Status</h3>
+        <p id="statusLead">Transmitter idle. No active distress signal broadcast.</p>
+        <div class="steps" aria-label="Distress delivery sequence">
+          <div class="step done"><div class="dot">✓</div>Sent</div>
+          <div class="step current"><div class="dot">·</div>Relayed</div>
+          <div class="step"><div class="dot">·</div>Command Desk</div>
+        </div>
+        <div class="tip">
+          <b>SURVIVOR PROTOCOL:</b><br>
+          <span id="tipText">Remain calm and maintain altitude. Conserve battery. Your emergency beacon is queued across mesh, SMS, and satellite gateways.</span>
+        </div>
+        <div class="status-actions">
+          <button class="btn wide" id="cancelSOS">Cancel Distress</button>
+          <button class="btn primary wide" id="upgradeBtn" style="display:none">SITUATION WORSE? UPGRADE TO RED (1-TAP)</button>
+        </div>
+      </div>
+
+      <div class="minirow" style="margin-top:20px;margin-bottom:8px;font-family:var(--font-display);font-size:12px;color:var(--cyan)">
+        <span>NEARBY SAFE HAVENS</span>
+        <span class="tiny">3 IDENTIFIED</span>
+      </div>
+
+      <div class="citizen-map-wrap">
+        <button class="btn locate-btn" id="locateMe">◎ Detect GPS Coordinates</button>
+        <div id="citizenMap" class="leaflet-map citizen-leaflet" role="application" aria-label="Area Map. Tap to set your position"></div>
+      </div>
+
+      <div id="citizenFacilities">
+        <div class="empty-state">Set position to scan for nearest non-compromised shelters.</div>
+      </div>
+
+      <div class="privacyline">ENCRYPTED MULTI-CHANNEL RELAY · MESH STORE & FORWARD</div>
+
+      <div class="panel" style="padding:16px;margin-top:18px">
+        <div class="eyebrow">RELAY CHANNEL SELECTOR</div>
+        <p style="margin:6px 0 10px;font-size:11px">Simulate emergency fallback propagation in network-denied areas.</p>
+        <select id="channel" aria-label="Select simulated relay channel" style="border:1px solid var(--space-border);border-radius:4px;padding:8px 12px;width:100%;background:#081427;color:var(--cyan);font-family:var(--font-mono)">
+          <option>Internet + SMS + Nearby Mesh</option>
+          <option>SMS Fallback Only (Lenient Sub-160 Char)</option>
+          <option>Bluetooth/Wi-Fi Direct Mesh Relay Only</option>
+          <option>LoRa / Satellite Gateway Sim</option>
+          <option>Offline Queue (Local Storage Persistence)</option>
+        </select>
+      </div>
+    </div>
+  </main>
+</div>
+
+<!-- Modal Dialog for Countdown / Re-label / Yellow Form -->
+<div class="modalback" id="modalBack" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+  <div class="modal" id="modal"></div>
+</div>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<!-- Core application logic scripts -->
+<script>
+const initial=[];let items=[];let activeSOS=null;let countdown=null;let secs=5;let personCount=1;let selectedNeed='Water';const byId=x=>document.getElementById(x);let language='en';function save(){localStorage.setItem('disastra-sos',JSON.stringify(items));renderQueue()}function toast(s){let t=byId('toast');t.textContent=s;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2800)}function showPage(name){document.querySelectorAll('.page').forEach(e=>e.classList.toggle('active',e.id===name));byId('tab-command').classList.toggle('active',name==='command');byId('tab-citizen').classList.toggle('active',name==='citizen');byId('tab-command').setAttribute('aria-selected',name==='command');byId('tab-citizen').setAttribute('aria-selected',name==='citizen');window.scrollTo(0,0)}byId('tab-command').onclick=()=>showPage('command');byId('tab-citizen').onclick=()=>showPage('citizen');
+function renderQueue(){const lev=byId('levelFilter').value,need=byId('needFilter').value;let sorted=[...items].filter(x=>(lev==='all'||x.level===lev)&&(need==='all'||x.need===need)).sort((a,b)=>(a.level===b.level?b.score-a.score||a.wait-b.wait:a.level==='red'?-1:1));byId('queueCount').textContent=items.filter(x=>!['Closed','Cancelled','Dispatched'].includes(x.status)).length;byId('queue').innerHTML=sorted.map(x=>`<article class="qitem ${x.level}" data-id="${x.id}"><div class="qicon" aria-label="${x.level==='red'?'Red SOS urgent':'Yellow SOS need help'}">${x.level==='red'?'♨':'⚠'}</div><div><div class="qtitle">${x.level==='red'?'RED SOS · URGENT':'YELLOW SOS · ASSIST'} ${x.flag?`<span style="color:#ffaa00">${x.flag}</span>`:''}</div><div class="qmeta">${x.id} · ${x.where} · ${x.need} · ${x.people} person${x.people>1?'s':''} · ${x.wait} min elapsed</div></div><span class="tag ${x.level==='yellow'?'yellow':''}">${x.level==='red'?'CRITICAL':'ASSIST'}</span><div class="qactions">${x.level==='red'?`<button class="btn primary oneDispatch" data-id="${x.id}">One-tap Dispatch</button><button class="btn ack" data-id="${x.id}">Acknowledge</button>`:`<button class="btn upgradeQueue" data-id="${x.id}">Upgrade to Red SOS</button><button class="btn ack" data-id="${x.id}">Acknowledge</button>`}<button class="btn relabel" data-id="${x.id}">Re-label</button></div></article>`).join('')||'<p class="notice">No active beacons matching current filter matrix.</p>';document.querySelectorAll('.ack').forEach(b=>b.onclick=()=>{let x=items.find(a=>a.id===b.dataset.id);x.status='Acknowledged';b.closest('.qitem').style.opacity='.5';toast(`${x.id} confirmed acknowledged by command control`)});document.querySelectorAll('.upgradeQueue').forEach(b=>b.onclick=()=>upgrade(b.dataset.id));document.querySelectorAll('.oneDispatch').forEach(b=>b.onclick=()=>dispatchOne(b.dataset.id));document.querySelectorAll('.relabel').forEach(b=>b.onclick=()=>relabel(b.dataset.id))}byId('levelFilter').onchange=renderQueue;byId('needFilter').onchange=renderQueue;renderQueue();
+function openModal(html){byId('modal').innerHTML=html;byId('modalBack').classList.add('open')}function closeModal(){byId('modalBack').classList.remove('open')}byId('modalBack').onclick=e=>{if(e.target===byId('modalBack'))closeModal()};document.addEventListener('keydown',e=>{if(e.key==='Escape'&&byId('modalBack').classList.contains('open')){if(byId('cancelTimer'))byId('cancelTimer').click();else closeModal()}});function createSOS(level,need='Medical',people=1){if(navigator.vibrate)navigator.vibrate(level==='red'?[180,80,180,80,350]:[100,80,100]);if(window.speechSynthesis&&localStorage.getItem('disastra-voice')==='on'){let u=new SpeechSynthesisUtterance(level==='red'?'Red alert sent':'Yellow request sent');u.lang=language==='en'?'en-IN':'hi-IN';speechSynthesis.speak(u)}let id=(level==='red'?'R':'Y')+'-'+String(Date.now()).slice(-6);let x={id,level,need,where:'Sector Aluva · approx.',people,wait:0,score:level==='red'?100:40,flag:'',status:'Queued',time:new Date().toISOString()};items.unshift(x);save();activeSOS=x;updateStatus(x);toast(`${level==='red'?'Red Critical Distress':'Yellow Assistance Request'} saved · Transmission Queued`);showPage('citizen');return x}function updateStatus(x){if(!x)return;byId('statusLead').textContent=`${x.level==='red'?'RED SOS · CRITICAL':'YELLOW SOS · ASSIST'} · ${x.id} · Encrypted Queue`;byId('upgradeBtn').style.display=x.level==='yellow'?'block':'none';document.querySelectorAll('.step').forEach((s,i)=>{s.classList.toggle('done',i===0);s.classList.toggle('current',i===1);s.querySelector('.dot').textContent=i===0?'✓':i===1?'·':'·'});byId('tipText').textContent=x.level==='red'?'Tactical responders are prioritized for your coordinates. Stay above water level.':'Conserve device power. Signal is broadcast to nearby rescue vehicles.'}
+byId('redSOS').onclick=()=>{secs=5;openModal(`<h2 id="modalTitle">TRANSMIT RED SOS?</h2><p>Life-threatening emergency beacon will broadcast. Stored in non-volatile memory first.</p><div class="count" id="countdown">5</div><button id="cancelTimer" class="cancel">ABORT COUNTDOWN</button><div class="privacyline" style="margin-top:14px;color:#7492b3;font-size:10px">Transmits in parallel via Internet, SMS, and Mesh</div>`);countdown=setInterval(()=>{secs--;let n=byId('countdown');if(n)n.textContent=secs;if(secs<=0){clearInterval(countdown);closeModal();let x=createSOS('red','Medical',1);x.status='Queued';updateStatus(x)}},1000);byId('cancelTimer').onclick=()=>{clearInterval(countdown);openModal(`<h2 id="modalTitle">ABORT RED SOS?</h2><p>Distress alert transmission has been paused.</p><div class="status-actions"><button class="btn wide" id="keepSOS">Resume Beacon</button><button class="btn redbtn wide" id="confirmCancel">Confirm Abort</button></div>`);byId('keepSOS').onclick=()=>{closeModal();countdown=setInterval(()=>{secs--;let n=byId('countdown');if(n)n.textContent=secs;if(secs<=0){clearInterval(countdown);closeModal();let x=createSOS('red','Medical',1);updateStatus(x)}},1000)};byId('confirmCancel').onclick=()=>{clearInterval(countdown);closeModal();toast('Red Distress Alert Aborted')}}};
+byId('yellowSOS').onclick=()=>{selectedNeed='Water';personCount=1;openYellow()};function openYellow(){openModal(`<h2 id="modalTitle">RESOURCE ASSISTANCE REQUEST</h2><p>Select required relief supplies. No typing required.</p><div class="needgrid">${[['✚','Minor medical'],['◉','Food / water'],['＋','Medicines'],['⌂','Evacuation help'],['⋯','Other']].map(([i,n])=>`<button class="need ${selectedNeed===n?'selected':''}" data-need="${n}">${i} &nbsp;${n}</button>`).join('')}</div><p style="font-family:var(--font-display);font-size:12px;margin:12px 0 6px">SURVIVOR HEADCOUNT</p><div class="countrow"><button id="minus" aria-label="Remove one person">−</button><strong id="peopleNumber">${personCount}</strong><button id="plus" aria-label="Add one person">+</button></div><button class="yellow-send" id="sendYellow">TRANSMIT YELLOW SOS</button><div class="privacyline" style="margin-top:12px;font-size:10px;color:#7492b3">Sequential low-power transmission to conserve battery</div>`);document.querySelectorAll('.need').forEach(b=>b.onclick=()=>{selectedNeed=b.dataset.need;openYellow()});byId('minus').onclick=()=>{personCount=Math.max(1,personCount-1);byId('peopleNumber').textContent=personCount};byId('plus').onclick=()=>{personCount=Math.min(99,personCount+1);byId('peopleNumber').textContent=personCount};byId('sendYellow').onclick=()=>{closeModal();const map={'Minor medical':'Medical','Food / water':'Water','Medicines':'Medical','Evacuation help':'Evacuation','Other':'Other'};createSOS('yellow',map[selectedNeed]||selectedNeed,personCount)}};
+function upgrade(id){let x=items.find(a=>a.id===id);if(!x)return;x.level='red';x.score=100;x.flag='';x.id='R-'+x.id.split('-')[1];items=items.filter(a=>a!==x);items.unshift(x);save();if(activeSOS===x)updateStatus(x);toast('Beacon elevated to Red SOS · Repositioned to queue apex')}byId('upgradeBtn').onclick=()=>{if(activeSOS)upgrade(activeSOS.id)};byId('safeBtn').onclick=()=>toast('Transmitter status marked: ALL SAFE.');byId('cancelSOS').onclick=()=>{if(!activeSOS){toast('No active transmission found');return}openModal(`<h2 id="modalTitle">CANCEL DISTRESS BEACON?</h2><p>Confirm stand-down with tactical rescue command.</p><div class="status-actions"><button class="btn wide" id="keepActive">Keep Beacon Active</button><button class="btn redbtn wide" id="confirmActiveCancel">Confirm Stand-Down</button></div>`);byId('keepActive').onclick=closeModal;byId('confirmActiveCancel').onclick=()=>{activeSOS.status='Cancelled';save();closeModal();toast('Stand-down dispatched to command desk')}};
+function dispatchOne(id){let x=items.find(a=>a.id===id);if(!x)return;openModal(`<h2 id="modalTitle">CONFIRM FAST-LANE DISPATCH</h2><p><b>RED SOS // URGENT RESCUE</b><br>${x.id} · ${x.where}<br>Ambulance 04 → General Hospital Ernakulam<br>Safe Corridor Route · 24 min · ${x.people} survivors</p><p style="font-size:11px;color:#7492b3">Tactical vehicle notified. Hospital pre-alert triggered.</p><div class="status-actions"><button class="btn wide" id="backDispatch">Review Vector</button><button class="btn primary wide" id="yesDispatch">Authorize Dispatch</button></div>`);byId('backDispatch').onclick=closeModal;byId('yesDispatch').onclick=()=>{x.status='Dispatched';closeModal();toast(`Tactical Unit Dispatched to ${x.id}`);renderQueue()}}byId('dispatchBtn').onclick=()=>dispatchOne('R-2041');function relabel(id){let x=items.find(a=>a.id===id);if(!x)return;openModal(`<h2 id="modalTitle">OPERATOR RE-LABEL SEVERITY</h2><p>Mandatory reason logged to event telemetry ledger.</p><select id="newLevel" style="width:100%;padding:10px;border:1px solid var(--space-border);border-radius:4px;background:#081427;color:#fff"><option value="red">Red SOS · Critical</option><option value="yellow">Yellow SOS · Assist</option></select><input id="reason" placeholder="Enter reason (Mandatory)" style="width:100%;padding:10px;margin-top:10px;border:1px solid var(--space-border);border-radius:4px;background:#081427;color:#fff"><div class="status-actions"><button class="btn wide" id="noRelabel">Cancel</button><button class="btn primary wide" id="yesRelabel">Commit Re-label</button></div>`);byId('newLevel').value=x.level;byId('noRelabel').onclick=closeModal;byId('yesRelabel').onclick=()=>{if(!byId('reason').value.trim()){toast('A logged reason is strictly required by the protocol');return}const next=byId('newLevel').value;if(next!==x.level){const oldId=x.id;if(next==='red')upgrade(id);else{x.level='yellow';x.score=Math.max(40,x.score);x.id='Y-'+oldId.split('-')[1];items=items.filter(a=>a!==x);items.push(x);save()}}x.reason=byId('reason')?.value||'';closeModal();toast('Distress classification change committed')}}
+byId('batchBtn').onclick=()=>{const n=items.filter(x=>x.level==='yellow'&&x.status!=='Dispatched').length;openModal(`<h2 id="modalTitle">BATCH YELLOW SOS FLEET</h2><p>${n} yellow assistance beacons ready for grouped supply routing.</p><button class="btn primary" id="approveBatch" style="width:100%">Authorize Cluster Route</button>`);byId('approveBatch').onclick=()=>{items.filter(x=>x.level==='yellow').forEach(x=>x.status='Dispatched');save();closeModal();toast('Cluster dispatch authorized for Yellow group')}};byId('enableAlerts').onclick=async()=>{try{let C=window.AudioContext||window.webkitAudioContext;if(C){let c=new C(),o=c.createOscillator(),g=c.createGain();o.frequency.value=880;g.gain.value=.04;o.connect(g);g.connect(c.destination);o.start();o.stop(c.currentTime+.18)}byId('enableAlerts').textContent='✓ KLAXON ACTIVE';localStorage.setItem('disastra-voice','on');toast('Audible satellite klaxon and telemetry voice activated')}catch(e){toast('Visual Red warning flash remains active')}};document.querySelectorAll('[data-layer]').forEach(c=>c.onchange=()=>{let layer=c.dataset.layer;let e=layer==='zones'?document.querySelectorAll('.map svg > path'):layer==='sos'?byId('mapSOS'):layer==='facilities'?document.querySelectorAll('.map svg > g[font-family="DM Sans"]'):document.querySelectorAll('.map svg > path[stroke]');if(layer==='zones'){document.querySelectorAll('.map svg > path[fill^="#e67"],.map svg > path[fill^="#f0c"]').forEach(x=>x.style.display=c.checked?'':'none')}else if(e instanceof Element)e.style.display=c.checked?'':'none';else e.forEach(x=>x.style.display=c.checked?'':'none')});byId('clusterToggle').onclick=e=>{let on=e.currentTarget.textContent.includes('ON');e.currentTarget.textContent=`⊙ Sensor Clusters: ${on?'OFF':'ON'}`;toast(on?'Displaying discrete beacon coordinates':'Clustered radar beacons enabled')};byId('zoomMap').onclick=()=>toast('Tactical radar zoom centered');document.querySelectorAll('.layer input').forEach(c=>c.setAttribute('aria-label',`Toggle ${c.parentElement.textContent.trim()} map layer`));
+byId('language').onchange=e=>{language=e.target.value;const hi=language==='hi',awa=language==='awa';byId('redSOS').setAttribute('aria-label',hi?'लाल SOS. तत्काल मदद':awa?'लाल SOS. तुरन्त मदद':'Red SOS. Urgent. Tap to send an emergency alert');byId('yellowSOS').setAttribute('aria-label',hi?'पीला SOS. मदद चाहिए':awa?'पीला SOS. मदद चाही':'Yellow SOS. Need help. Tap to ask for supplies or assistance');byId('redSOS').querySelector('strong').textContent=hi?'लाल SOS // अति आवश्यक':awa?'लाल SOS // तुरन्त':'RED SOS // CRITICAL';byId('yellowSOS').querySelector('strong').textContent=hi?'पीला SOS // सहायता':awa?'पीला SOS // मदद':'YELLOW SOS // ASSIST';byId('redSOS').querySelector('.sos-copy span').textContent=hi?'तत्काल · जान का खतरा · त्वरित सहायता':awa?'तत्काल · जान के खतरा · तुरन्त':'URGENT · LIFE IN DANGER · 1-TAP OVERRIDE';byId('yellowSOS').querySelector('.sos-copy span').textContent=hi?'मदद चाहिए · रसद, पानी, दवा':awa?'मदद चाही · पानी, खाना, दवाई':'NEED AID · FOOD, WATER, MEDICAL OR EVACUATION'};if('serviceWorker'in navigator&&location.protocol.startsWith('http'))navigator.serviceWorker.register('./sw.js').catch(()=>{});if(!localStorage.getItem('disastra-welcome')){localStorage.setItem('disastra-welcome','1')}
+</script>
+<script src="./app.js"></script>
+</body>
+</html>
